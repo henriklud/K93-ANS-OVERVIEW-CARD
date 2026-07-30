@@ -10,4 +10,4 @@
 A Home Assistant Lovelace card showing notification history and outstanding unacknowledged
 notifications from the **k93-ans** integration, with an optional full-width scrolling ticker.
 
-[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=henriklud&repository=K93-ANS-HA-OVERVIEW-CARD&category=plugin)
+[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=henriklud&repository=K93-ANS-OVERVIEW-CARD&category=plugin)
