@@ -46,8 +46,11 @@ function importanceRank(level) {
 function matchesFilter(record, channels, minImportance, channelMode) {
   if (record.show_in_history === false) return false;
   const hasList = Boolean(channels && channels.length);
-  const recordChannel = String(record.channel || "").toLowerCase();
-  const inList = hasList && channels.some((c) => String(c).toLowerCase() === recordChannel);
+  const recordChannels = (Array.isArray(record.channels) && record.channels.length
+    ? record.channels
+    : [record.channel]
+  ).map((c) => String(c || "").toLowerCase());
+  const inList = hasList && channels.some((c) => recordChannels.includes(String(c).toLowerCase()));
   const channelOk = channelMode === "exclude" ? !inList : !hasList || inList;
   const importanceOk = importanceRank(record.importance) >= importanceRank(minImportance || "low");
   return channelOk && importanceOk;
@@ -332,7 +335,12 @@ class K93AnsOverviewCard extends HTMLElement {
       : "";
 
     const metaParts = [];
-    if (this._config.show_channel) metaParts.push(esc(record.channel));
+    if (this._config.show_channel) {
+      const channelLabel = Array.isArray(record.channels) && record.channels.length
+        ? record.channels.join(", ")
+        : record.channel;
+      metaParts.push(esc(channelLabel));
+    }
     metaParts.push(esc(formatRelativeTime(record.created, locale, this._lang())));
 
     return `
