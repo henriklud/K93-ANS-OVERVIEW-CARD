@@ -303,15 +303,20 @@ class K93AnsOverviewCard extends HTMLElement {
     const showThumbnail = Boolean(record.image) && imageMode === "thumbnail";
     const showFullImage = Boolean(record.image) && imageMode === "full";
 
+    const icon = record.icon || "mdi:bell-outline";
+    const channelColor = this._channelColor(record);
+    const iconHtml = icon.startsWith("mdi:")
+      ? `<ha-icon icon="${esc(icon)}"${channelColor ? ` style="color: ${esc(channelColor)};"` : ""}></ha-icon>`
+      : `<img class="thumb" src="${esc(icon)}" alt="" />`;
+
     let leftHtml;
     if (showThumbnail) {
-      leftHtml = `<img class="row-image" data-lightbox-src="${esc(record.image)}" src="${esc(record.image)}" alt="" loading="lazy" />`;
+      leftHtml = `
+        <img class="row-image" data-lightbox-src="${esc(record.image)}" src="${esc(record.image)}" alt="" loading="lazy" />
+        <span class="icon-badge">${iconHtml}</span>
+      `;
     } else {
-      const icon = record.icon || "mdi:bell-outline";
-      const channelColor = this._channelColor(record);
-      leftHtml = icon.startsWith("mdi:")
-        ? `<ha-icon icon="${esc(icon)}"${channelColor ? ` style="color: ${esc(channelColor)};"` : ""}></ha-icon>`
-        : `<img class="thumb" src="${esc(icon)}" alt="" />`;
+      leftHtml = iconHtml;
     }
 
     const fullImageHtml = showFullImage
@@ -657,7 +662,22 @@ class K93AnsOverviewCard extends HTMLElement {
         /* A picture (record.image) gets a bigger box than the plain icon slot, sized to the
            image's own aspect ratio (max-width/max-height with natural width/height) rather than
            object-fit: cover, so nothing about it is cropped. */
-        .icon-image { width: auto; height: auto; max-width: 64px; max-height: 64px; }
+        .icon-image { width: auto; height: auto; max-width: 64px; max-height: 64px; position: relative; }
+        .icon-badge {
+          position: absolute;
+          right: -4px;
+          bottom: -4px;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: var(--card-background-color, var(--ha-card-background, #fff));
+          box-shadow: 0 0 0 1px var(--divider-color);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .icon-badge ha-icon { --mdc-icon-size: 12px; color: var(--secondary-text-color); }
+        .icon-badge .thumb { width: 12px; height: 12px; border-radius: 50%; }
         .row-image {
           display: block;
           max-width: 64px;
