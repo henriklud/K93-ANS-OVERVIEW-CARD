@@ -43,7 +43,19 @@ function importanceRank(level) {
   return idx === -1 ? IMPORTANCE_LEVELS.indexOf("normal") : idx;
 }
 
-function matchesFilter(record, channels, minImportance, channelMode) {
+const CHANNEL_IMPORTANCE_PREFIX = "history_channel_importance__";
+
+function perChannelImportanceFromConfig(cfg) {
+  const map = {};
+  for (const key of Object.keys(cfg || {})) {
+    if (key.startsWith(CHANNEL_IMPORTANCE_PREFIX) && cfg[key]) {
+      map[key.slice(CHANNEL_IMPORTANCE_PREFIX.length)] = cfg[key];
+    }
+  }
+  return map;
+}
+
+function matchesFilter(record, channels, minImportance, channelMode, perChannelImportance) {
   if (record.show_in_history === false) return false;
   const hasList = Boolean(channels && channels.length);
   const recordChannels = (Array.isArray(record.channels) && record.channels.length
@@ -52,8 +64,19 @@ function matchesFilter(record, channels, minImportance, channelMode) {
   ).map((c) => String(c || "").toLowerCase());
   const inList = hasList && channels.some((c) => recordChannels.includes(String(c).toLowerCase()));
   const channelOk = channelMode === "exclude" ? !inList : !hasList || inList;
-  const importanceOk = importanceRank(record.importance) >= importanceRank(minImportance || "low");
-  return channelOk && importanceOk;
+  if (!channelOk) return false;
+
+  const recordRank = importanceRank(record.importance);
+  if (channelMode !== "exclude" && hasList && perChannelImportance) {
+    const selectedLower = channels.map((c) => String(c).toLowerCase());
+    const matchingChannels = recordChannels.filter((c) => selectedLower.includes(c));
+    return matchingChannels.some((c) => {
+      const threshold = perChannelImportance[c] || minImportance || "low";
+      return recordRank >= importanceRank(threshold);
+    });
+  }
+
+  return recordRank >= importanceRank(minImportance || "low");
 }
 
 function formatRelativeTime(iso, locale, lang) {
@@ -68,7 +91,10 @@ function formatRelativeTime(iso, locale, lang) {
 
   if (diffDays === 0) return `${strings.today} ${time}`;
   if (diffDays === 1) return `${strings.yesterday} ${time}`;
-  if (diffDays > 1 && diffDays < 7) return `${date.toLocaleDateString(locale, { weekday: "long" })} ${time}`;
+  if (diffDays > 1 && diffDays < 7) {
+    const weekday = date.toLocaleDateString(locale, { weekday: "long" });
+    return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${time}`;
+  }
   return `${date.toLocaleDateString(locale)} ${time}`;
 }
 
@@ -403,8 +429,9 @@ class K93AnsOverviewCard extends HTMLElement {
     const cfg = this._config;
     if (!cfg.show_ticker) return "";
 
+    const perChannelImportance = perChannelImportanceFromConfig(cfg);
     const items = (this._notifications || [])
-      .filter((n) => matchesFilter(n, cfg.history_channels, cfg.history_min_importance, cfg.history_channels_mode))
+      .filter((n) => matchesFilter(n, cfg.history_channels, cfg.history_min_importance, cfg.history_channels_mode, perChannelImportance))
       .slice(0, cfg.ticker_limit ?? 10);
 
     if (!items.length) return "";
@@ -440,7 +467,7 @@ class K93AnsOverviewCard extends HTMLElement {
     const unacknowledged = all.filter(
       (n) => n.requires_ack && !n.acknowledged && n.show_in_history !== false
     );
-    const history = all.filter((n) => matchesFilter(n, cfg.history_channels, cfg.history_min_importance, cfg.history_channels_mode));
+    const history = all.filter((n) => matchesFilter(n, cfg.history_channels, cfg.history_min_importance, cfg.history_channels_mode, perChannelImportanceFromConfig(cfg)));
 
     const sections = [];
     if (cfg.show_unacknowledged) {
@@ -851,7 +878,14 @@ class K93AnsOverviewCardEditor extends HTMLElement {
   connectedCallback() {
     if (!this._form) {
       this._form = document.createElement("ha-form");
-      this._form.computeLabel = (item) => K93AnsOverviewCardEditor.LABELS[item.name] || item.name;
+      this._form.computeLabel = (item) => {
+        if (item.name.startsWith(CHANNEL_IMPORTANCE_PREFIX)) {
+          const channelKey = item.name.slice(CHANNEL_IMPORTANCE_PREFIX.length);
+          const option = this._channelOptions().find((o) => o.value === channelKey);
+          return `${option ? option.label : channelKey}: minimum importance`;
+        }
+        return K93AnsOverviewCardEditor.LABELS[item.name] || item.name;
+      };
       this._form.addEventListener("value-changed", (ev) => {
         ev.stopPropagation();
         this._config = ev.detail.value;
@@ -929,6 +963,17 @@ class K93AnsOverviewCardEditor extends HTMLElement {
       },
     };
 
+    const perChannelImportanceSelector = {
+      select: { options: [{ value: "", label: "(use global default)" }, ...importanceOptions] },
+    };
+    const selectedChannels = (this._config?.history_channels_mode || "include") !== "exclude"
+      ? (this._config?.history_channels || [])
+      : [];
+    const perChannelImportanceFields = selectedChannels.map((channelKey) => ({
+      name: `${CHANNEL_IMPORTANCE_PREFIX}${channelKey}`,
+      selector: perChannelImportanceSelector,
+    }));
+
     return [
       { name: "title", selector: { text: {} } },
       { name: "title_icon", selector: { icon: {} } },
@@ -953,6 +998,7 @@ class K93AnsOverviewCardEditor extends HTMLElement {
       { name: "history_channels_mode", selector: channelModeSelector },
       { name: "history_channels", selector: channelSelector },
       { name: "history_min_importance", selector: importanceSelector },
+      ...perChannelImportanceFields,
       { name: "show_ticker", selector: { boolean: {} } },
       { name: "ticker_limit", selector: { number: { min: 1, max: 500, mode: "box" } } },
       {
