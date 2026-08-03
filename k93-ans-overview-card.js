@@ -1,6 +1,54 @@
 
 const IMPORTANCE_LEVELS = ["low", "normal", "high", "critical"];
 
+function fireDomEvent(node, type, detail) {
+  const event = new CustomEvent(type, { bubbles: true, cancelable: false, composed: true, detail });
+  node.dispatchEvent(event);
+  return event;
+}
+
+function handleTapAction(node, hass, actionConfig) {
+  const config = actionConfig || { action: "none" };
+  switch (config.action) {
+    case "navigate":
+      if (config.navigation_path) {
+        if (config.navigation_replace) {
+          history.replaceState(null, "", config.navigation_path);
+        } else {
+          history.pushState(null, "", config.navigation_path);
+        }
+        fireDomEvent(window, "location-changed", { replace: Boolean(config.navigation_replace) });
+      }
+      break;
+    case "url":
+      if (config.url_path) {
+        window.open(config.url_path, config.new_tab === false ? "_self" : "_blank");
+      }
+      break;
+    case "more-info":
+      if (config.entity) {
+        fireDomEvent(node, "hass-more-info", { entityId: config.entity });
+      }
+      break;
+    case "toggle":
+      if (config.entity && hass) {
+        hass.callService("homeassistant", "toggle", {}, { entity_id: config.entity });
+      }
+      break;
+    case "call-service":
+    case "perform-action": {
+      const serviceStr = config.perform_action || config.service;
+      if (serviceStr && hass) {
+        const [domain, service] = serviceStr.split(".");
+        hass.callService(domain, service, config.data || config.service_data || {}, config.target);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 const BUILTIN_CHANNEL_KEYS = ["info", "alert", "event", "reminder", "security", "system"];
 
 const LOCALE_TAG = { en: "en", no: "nb-NO" };
@@ -164,6 +212,7 @@ class K93AnsOverviewCard extends HTMLElement {
       card_border_radius: null,
       card_border_color: null,
       card_border_width: null,
+      tap_action: { action: "none" },
       ...config,
     };
     this._render();
@@ -545,6 +594,7 @@ class K93AnsOverviewCard extends HTMLElement {
           padding: 16px 16px 8px;
           font-weight: 500;
         }
+        .card-header.tappable { cursor: pointer; }
         .title-icon {
           display: inline-flex;
           align-items: center;
@@ -807,6 +857,11 @@ class K93AnsOverviewCard extends HTMLElement {
       this._headerEl = this.shadowRoot.querySelector(".card-header");
       this._scrollAreaEl = this.shadowRoot.querySelector(".scroll-area");
       this._lightboxHostEl = this.shadowRoot.querySelector(".lightbox-host");
+      this._headerEl.addEventListener("click", () => {
+        if (this._config?.tap_action?.action) {
+          handleTapAction(this, this._hass, this._config.tap_action);
+        }
+      });
     }
 
     if (cardThemeStyles.length) {
@@ -822,6 +877,8 @@ class K93AnsOverviewCard extends HTMLElement {
 
     this._headerEl.setAttribute("style", `font-size: ${Number(cfg.title_font_size) || 1.1}em;`);
     this._headerEl.innerHTML = `${headerIconHtml}<span>${esc(cfg.title)}</span>`;
+    const hasTapAction = Boolean(cfg.tap_action && cfg.tap_action.action && cfg.tap_action.action !== "none");
+    this._headerEl.classList.toggle("tappable", hasTapAction);
 
     this._scrollAreaEl.innerHTML = body;
     this._lightboxHostEl.innerHTML = this._renderLightbox();
@@ -856,6 +913,7 @@ class K93AnsOverviewCard extends HTMLElement {
       card_border_radius: null,
       card_border_color: null,
       card_border_width: null,
+      tap_action: { action: "none" },
     };
   }
 
@@ -1024,6 +1082,7 @@ class K93AnsOverviewCardEditor extends HTMLElement {
         name: "card_border_width",
         selector: { number: { min: 0, max: 20, step: 1, mode: "box", unit_of_measurement: "px" } },
       },
+      { name: "tap_action", selector: { ui_action: {} } },
     ];
   }
 
@@ -1068,6 +1127,7 @@ K93AnsOverviewCardEditor.LABELS = {
   card_border_radius: "Card corner radius override (px, blank = theme default)",
   card_border_color: "Card border color override (CSS color, blank = theme default)",
   card_border_width: "Card border width override (px, blank = theme default)",
+  tap_action: "Tap action (title/icon row)",
 };
 
 customElements.define("k93-ans-overview-card", K93AnsOverviewCard);
