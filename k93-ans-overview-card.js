@@ -579,14 +579,6 @@ class K93AnsOverviewCard extends HTMLElement {
       this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; }
-
-        /* No background/border/box-shadow overrides in this stylesheet: by default ha-card's own
-           theme-driven styling is left untouched, which is what makes the card look like a native
-           part of the dashboard instead of a custom skin. card_background_color/card_border_*
-           are opt-in overrides applied as an inline style attribute directly on <ha-card> instead
-           (see cardThemeStyles below) - a plain style attribute on a custom element's host always
-           wins over that element's own internal :host{} rules, which is also how tools like
-           card-mod work. */
         ha-card {
           display: flex;
           flex-direction: column;
@@ -625,8 +617,6 @@ class K93AnsOverviewCard extends HTMLElement {
           min-width: 0;
           overflow: hidden;
           white-space: nowrap;
-          /* Fades the scrolling text to transparent at both edges of the viewport (fixed
-             positions, not tied to scroll offset) instead of clipping it abruptly. */
           -webkit-mask-image: linear-gradient(to right, transparent 0, black 24px, black calc(100% - 24px), transparent 100%);
           mask-image: linear-gradient(to right, transparent 0, black 24px, black calc(100% - 24px), transparent 100%);
         }
@@ -743,9 +733,6 @@ class K93AnsOverviewCard extends HTMLElement {
           margin-top: 2px;
         }
         .thumb { width: 22px; height: 22px; border-radius: 5px; object-fit: cover; }
-        /* A picture (record.image) gets a bigger box than the plain icon slot, sized to the
-           image's own aspect ratio (max-width/max-height with natural width/height) rather than
-           object-fit: cover, so nothing about it is cropped. */
         .icon-image { width: auto; height: auto; max-width: 64px; max-height: 64px; position: relative; }
         .icon-badge {
           position: absolute;
