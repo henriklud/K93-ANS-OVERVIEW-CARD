@@ -252,6 +252,13 @@ class K93AnsOverviewCard extends HTMLElement {
     return base + Math.min(this._notifications.length, cfg?.max_items ?? 5);
   }
 
+  getGridOptions() {
+    const cfg = this._config;
+    if (!cfg?.card_height) return undefined;
+    const rows = Math.max(1, Math.round((Number(cfg.card_height) + 8) / 64));
+    return { rows };
+  }
+
   disconnectedCallback() {
     if (this._unsubscribe) {
       this._unsubscribe();
